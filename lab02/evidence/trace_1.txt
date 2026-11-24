@@ -1,0 +1,11 @@
+Question: I have GHS 1,200. I want 4 bags of rice at GHS 185 each and 3 gallons of oil at GHS 95 each. How much will I have left?
+[model reply rejected by API]
+Observation: Your last reply was rejected because you used function calling. Reply in plain text using the Thought / Action / Action Input format.
+Thought: I need to compute the remaining amount after buying the rice and oil.  
+Action: calculator  
+Action Input: 1200 - (4*185 + 3*95)
+Observation: 175
+Thought: The calculation shows I will have GHS 175 left.  
+Action: finish  
+Action Input: You will have GHS 175 remaining.
+FINAL ANSWER: You will have GHS 175 remaining.
