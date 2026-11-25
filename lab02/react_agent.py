@@ -1,8 +1,8 @@
-import os, re, sys, glob
+import os, re, sys, glob, time
 from dotenv import load_dotenv
 from litellm import completion
+from litellm.exceptions import BadRequestError, RateLimitError
 from tools import calculator, wiki_lookup
-from litellm.exceptions import BadRequestError
 
 load_dotenv()
 MODEL = os.getenv("LLM_MODEL")
@@ -15,8 +15,18 @@ You can use these tools:
 - wiki_lookup: returns a Wikipedia summary for a page title
 - finish: give the final answer to the user
 
-IMPORTANT: Do NOT use function calling, tool calls or JSON. The tools are
-used only through the plain text format below.
+Rules:
+- For ANY arithmetic, even simple multiplication, write "Action: calculator".
+- For ANY factual question about a place, person or thing, write
+  "Action: wiki_lookup".
+- Never answer from memory. Every fact or number in your final answer must
+  come from an Observation.
+- If the question has two parts, handle one part per step, and use finish
+  only after both parts have an Observation.
+
+IMPORTANT: Never use function calling, tool calls or JSON. Your whole reply
+must be plain text in the format below. The words calculator and wiki_lookup
+are written after "Action:", they are not functions you can call.
 
 On every step reply in EXACTLY this format and nothing else:
 Thought: <your reasoning>
@@ -33,6 +43,7 @@ Never write an Observation yourself."""
 
 ACTION_RE = re.compile(r"Action:\s*(\w+)\s*\nAction Input:\s*(.*)", re.DOTALL)
 
+
 def parse(text):
     m = ACTION_RE.search(text)
     if not m:
@@ -40,36 +51,89 @@ def parse(text):
     return m.group(1).strip(), m.group(2).strip()
 
 
+def call_model(messages):
+    """Call the model; if the free tier rate limit is hit, wait and retry."""
+    for attempt in range(4):
+        try:
+            return completion(model=MODEL, messages=messages,
+                              temperature=0, stop=["Observation:"])
+        except RateLimitError:
+            wait = 15 * (attempt + 1)
+            print(f"[rate limit hit, waiting {wait}s]")
+            time.sleep(wait)
+    return completion(model=MODEL, messages=messages,
+                      temperature=0, stop=["Observation:"])
+
+
 def run_agent(question, max_steps=6):
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": question}]
     trace = [f"Question: {question}"]
+    finished = False
+    steps = 0
+    rejections = 0
+    stop_reason = None
+    seen = set()
 
-    for step in range(max_steps):
+    while steps < max_steps:
         try:
-            resp = completion(model=MODEL, messages=messages,
-                              temperature=0, stop=["Observation:"])
-            reply = resp.choices[0].message.content.strip()
+            resp = call_model(messages)
         except BadRequestError:
-            obs = ("Observation: Your last reply was rejected because you used "
-                   "function calling. Reply in plain text using the "
-                   "Thought / Action / Action Input format.")
-            trace.append("[model reply rejected by API]")
-            trace.append(obs)
-            messages.append({"role": "user", "content": obs})
+            rejections += 1
+            trace.append("[model reply rejected by API: used function calling]")
+            if rejections >= 3:
+                stop_reason = "STOPPED: model kept using function calling (3 rejections)."
+                break
+            # keep the conversation in order: add the note to the last message
+            messages[-1]["content"] += (
+                "\n\n(Note: your previous attempt was rejected because it used "
+                "function calling. Reply in plain text only, using the "
+                "Thought / Action / Action Input format, and continue from "
+                "where you were.)")
+            trace.append("[correction added to the conversation]")
             continue
 
+        steps += 1
+        reply = resp.choices[0].message.content.strip()
         trace.append(reply)
         action, action_input = parse(reply)
-        if action == "finish":
-            trace.append(f"FINAL ANSWER: {action_input}")
-            break
 
-        result = TOOLS[action](action_input)   # Step 5 will harden this line
-        obs = f"Observation: {result}"
+        # Case 1: reply cannot be parsed
+        if action is None:
+            obs = ("Observation: Could not parse your reply. Reply with exactly "
+                   "one step in this format:\nThought: ...\n"
+                   "Action: calculator OR wiki_lookup OR finish\n"
+                   "Action Input: ...")
+        # Finished
+        elif action == "finish":
+            trace.append(f"FINAL ANSWER: {action_input}")
+            finished = True
+            break
+        # Case 2: unknown action name
+        elif action not in TOOLS:
+            obs = (f"Observation: Unknown action '{action}'. Valid actions are: "
+                   "calculator, wiki_lookup, finish.")
+        # Case 3: the same action repeated (loop detection)
+        elif (action, action_input) in seen:
+            obs = ("Observation: You already ran this exact action and have the "
+                   "result above. Do the NEXT part of the question with a "
+                   "different action, or use finish if you have everything.")
+        # Normal tool call
+        else:
+            seen.add((action, action_input))
+            try:
+                obs = f"Observation: {TOOLS[action](action_input)}"
+            except Exception as e:
+                obs = f"Observation: Tool failed: {e}"
+
         trace.append(obs)
         messages.append({"role": "assistant", "content": reply})
         messages.append({"role": "user", "content": obs})
+
+    # Case 4: ran out of steps (or too many rejections)
+    if not finished:
+        trace.append(stop_reason or
+                     f"STOPPED: reached max_steps ({max_steps}) without finishing.")
 
     text = "\n".join(trace)
     print(text)
@@ -77,6 +141,7 @@ def run_agent(question, max_steps=6):
     n = len(glob.glob("evidence/trace_*.txt")) + 1
     with open(f"evidence/trace_{n}.txt", "w") as f:
         f.write(text)
+
 
 if __name__ == "__main__":
     run_agent(" ".join(sys.argv[1:]))

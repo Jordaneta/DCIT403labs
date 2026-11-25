@@ -1,0 +1,13 @@
+Question: rice how much 4 bag and the 185 is cost money left 1200??
+[model reply rejected by API]
+Observation: Your last reply was rejected because you used function calling. Reply in plain text using the Thought / Action / Action Input format.
+[model reply rejected by API]
+Observation: Your last reply was rejected because you used function calling. Reply in plain text using the Thought / Action / Action Input format.
+Thought: Calculate the remaining money after buying 4 bags of rice at 185 each.  
+Action: calculator  
+Action Input: 1200 - 4*185
+Observation: 460
+Thought: The remaining money after buying 4 bags of rice at 185 each is 460.  
+Action: finish  
+Action Input: 460
+FINAL ANSWER: 460

@@ -1,0 +1,11 @@
+Question: Which region of Ghana is Kumasi in? Also, what is the total cost of 250 kg of maize at GHS 3.5 per kg?
+[model reply rejected by API: used function calling]
+[correction added to the conversation]
+Thought: I need to find the region of Ghana where Kumasi is located.  
+Action: wiki_lookup  
+Action Input: Kumasi region Ghana
+Observation: No Wikipedia page found for 'Kumasi region Ghana'.
+[model reply rejected by API: used function calling]
+[correction added to the conversation]
+[model reply rejected by API: used function calling]
+STOPPED: model kept using function calling (3 rejections).

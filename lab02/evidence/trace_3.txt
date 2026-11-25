@@ -1,0 +1,7 @@
+Question: Say hello and tell me in one sentence what you can help a trader with.
+[model reply rejected by API]
+Observation: Your last reply was rejected because you used function calling. Reply in plain text using the Thought / Action / Action Input format.
+Thought: I need to greet the user and explain my assistance in one sentence.  
+Action: finish  
+Action Input: Hello! I can help traders at Makola Market by providing quick calculations, market insights, and up-to-date information to support their trading decisions.
+FINAL ANSWER: Hello! I can help traders at Makola Market by providing quick calculations, market insights, and up-to-date information to support their trading decisions.

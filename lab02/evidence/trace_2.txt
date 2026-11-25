@@ -1,0 +1,13 @@
+Question: What does Wikipedia say about the Zorblax Central Market in Ghana?
+[model reply rejected by API]
+Observation: Your last reply was rejected because you used function calling. Reply in plain text using the Thought / Action / Action Input format.
+[model reply rejected by API]
+Observation: Your last reply was rejected because you used function calling. Reply in plain text using the Thought / Action / Action Input format.
+Thought: I need to retrieve the Wikipedia summary for "Zorblax Central Market".  
+Action: wiki_lookup  
+Action Input: Zorblax Central Market
+Observation: No Wikipedia page found for 'Zorblax Central Market'.
+Thought: No Wikipedia page exists for "Zorblax Central Market".  
+Action: finish  
+Action Input: I couldn't find a Wikipedia entry for Zorblax Central Market in Ghana. If you have more details or another name, I can try again.
+FINAL ANSWER: I couldn't find a Wikipedia entry for Zorblax Central Market in Ghana. If you have more details or another name, I can try again.
