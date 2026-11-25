@@ -4,7 +4,7 @@ from litellm import completion
 from litellm.exceptions import BadRequestError, RateLimitError
 from tools import calculator, wiki_lookup
 
-load_dotenv()
+load_dotenv(override=True)
 MODEL = os.getenv("LLM_MODEL")
 
 TOOLS = {"calculator": calculator, "wiki_lookup": wiki_lookup}
@@ -16,9 +16,14 @@ You can use these tools:
 - finish: give the final answer to the user
 
 Rules:
-- For ANY arithmetic, even simple multiplication, write "Action: calculator".
+- For ANY arithmetic, even simple multiplication or subtraction, write
+  "Action: calculator". Never do arithmetic in your head.
 - For ANY factual question about a place, person or thing, write
   "Action: wiki_lookup".
+- For wiki_lookup, the Action Input must be ONLY the exact Wikipedia page
+  title, such as "Kumasi" or "Bono East Region". Never add extra words like
+  "capital" or "region of Ghana". If no page is found, retry with a shorter
+  title.
 - Never answer from memory. Every fact or number in your final answer must
   come from an Observation.
 - If the question has two parts, handle one part per step, and use finish
@@ -68,10 +73,10 @@ def call_model(messages):
 def run_agent(question, max_steps=6):
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": question}]
-    trace = [f"Question: {question}"]
+    trace = [f"Question: {question}", f"[model: {MODEL}]"]
     finished = False
     steps = 0
-    rejections = 0
+    rejections = 0          # rejections in a row, reset after a good reply
     stop_reason = None
     seen = set()
 
@@ -81,10 +86,9 @@ def run_agent(question, max_steps=6):
         except BadRequestError:
             rejections += 1
             trace.append("[model reply rejected by API: used function calling]")
-            if rejections >= 3:
-                stop_reason = "STOPPED: model kept using function calling (3 rejections)."
+            if rejections >= 4:
+                stop_reason = "STOPPED: model kept using function calling (4 rejections in a row)."
                 break
-            # keep the conversation in order: add the note to the last message
             messages[-1]["content"] += (
                 "\n\n(Note: your previous attempt was rejected because it used "
                 "function calling. Reply in plain text only, using the "
@@ -93,6 +97,7 @@ def run_agent(question, max_steps=6):
             trace.append("[correction added to the conversation]")
             continue
 
+        rejections = 0
         steps += 1
         reply = resp.choices[0].message.content.strip()
         trace.append(reply)
@@ -122,9 +127,13 @@ def run_agent(question, max_steps=6):
         else:
             seen.add((action, action_input))
             try:
-                obs = f"Observation: {TOOLS[action](action_input)}"
+                result = TOOLS[action](action_input)
             except Exception as e:
-                obs = f"Observation: Tool failed: {e}"
+                result = f"Tool failed: {e}"
+            if result.startswith("No Wikipedia page found"):
+                result += (" Hint: use only the exact page title, "
+                           "for example 'Kumasi' or 'Bono East Region'.")
+            obs = f"Observation: {result}"
 
         trace.append(obs)
         messages.append({"role": "assistant", "content": reply})

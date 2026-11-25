@@ -1,0 +1,10 @@
+Question: I have GHS 1,200. I want 4 bags of rice at GHS 185 each and 3 gallons of oil at GHS 95 each. How much will I have left?
+[model: gemini/gemini-3.5-flash-lite]
+[model reply rejected by API: used function calling]
+[correction added to the conversation]
+[model reply rejected by API: used function calling]
+[correction added to the conversation]
+[model reply rejected by API: used function calling]
+[correction added to the conversation]
+[model reply rejected by API: used function calling]
+STOPPED: model kept using function calling (4 rejections in a row).
